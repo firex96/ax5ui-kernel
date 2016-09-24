@@ -3,10 +3,11 @@
 
     var UI = ax5.ui;
     var U = ax5.util;
+    var UPLOADER;
 
     UI.addClass({
         className: "uploader",
-        version: "0.0.5"
+        version: "0.0.6"
     }, (function () {
         /**
          * @class ax5uploader
@@ -35,76 +36,16 @@
 
             cfg = this.config;
 
-            this.init = function () {
-
-                this.target = $(cfg.target);
-                this.target.html(this.__get_layout());
-
-                this.els = {
-                    "container": this.target.find('[data-ui-els="container"]'),
-                    "preview": this.target.find('[data-ui-els="preview"]'),
-                    "preview-img": this.target.find('[data-ui-els="preview-img"]'),
-                    "input-file": this.target.find('[data-ui-els="input-file"]'),
-                    "progress": this.target.find('[data-ui-els="progress"]'),
-                    "progress-bar": this.target.find('[data-ui-els="progress-bar"]')
-                };
-
-                this.els["preview"].bind("click", (function () {
-                    this.__request_select_file();
-                }).bind(this));
-
-                this.els["input-file"].bind("change", (function (e) {
-                    this.__on_select_file(e || window.event);
-                }).bind(this));
-
-                (function () {
-
-                    var dragZone = this.els["container"],
-                        preview_img = this.els["preview-img"],
-                        _this = this, timer;
-
-                    dragZone.get(0).addEventListener('dragover', function (e) {
-                        e.stopPropagation();
-                        e.preventDefault();
-
-                        preview_img.hide();
-                        if (timer) clearTimeout(timer);
-
-                        dragZone.addClass("dragover");
-                    }, false);
-                    dragZone.get(0).addEventListener('dragleave', function (e) {
-                        e.stopPropagation();
-                        e.preventDefault();
-
-                        if (timer) clearTimeout(timer);
-                        timer = setTimeout(function () {
-                            preview_img.show();
-                        }, 100);
-
-                        dragZone.removeClass("dragover");
-                    }, false);
-
-                    dragZone.get(0).addEventListener('drop', function (e) {
-                        e.stopPropagation();
-                        e.preventDefault();
-
-                        dragZone.removeClass("dragover");
-                        _this.__on_select_file(e || window.event);
-                    }, false);
-
-                }).call(this);
-
-                setTimeout((function () {
-                    this.__set_size_layout();
-                }).bind(this), 1);
-
-
-            };
-
-            this.__get_layout = function () {
+            var getLayout = function () {
                 var po = [],
                     inputFileMultiple = "", // inputFileMultiple = 'multiple="multiple"',  support multifile
                     inputFileAccept = cfg.file_types;
+                var data = {
+                    theme: cfg.theme,
+
+                };
+
+                return UPLOADER.tmpl.get("layout", data);
 
                 po.push('<div class="ax5-ui-single-uploader ' + cfg.theme + '" data-ui-els="container">');
                 po.push('<div class="upload-preview" data-ui-els="preview">');
@@ -120,7 +61,7 @@
                 return po.join('');
             };
 
-            this.__set_size_layout = this.align = function () {
+            var align = function () {
                 var progress_margin = 20,
                     progress_height = this.els["progress"].height(),
                     ct_width = this.els["container"].width(),
@@ -133,10 +74,9 @@
                         width: ct_width - (progress_margin * 2)
                     });
                 }
-                //this.els["preview-img"].css({width: ct_width, height: ct_height});
             };
 
-            this.__request_select_file = function () {
+            var requestSelectFile = function () {
                 if (cfg.before_select_file) {
                     if (!cfg.before_select_file.call()) {
                         return false; // 중지
@@ -149,7 +89,7 @@
                             for (var i = 0; i < results.length; i++) {
                                 console.log('Image URI: ' + results[i]);
                             }
-                            _this.__on_select_file(results);
+                            onSelectFile.call(self, results);
                         }, function (error) {
                             console.log('Error: ' + error);
                         }
@@ -159,7 +99,7 @@
                 }
             };
 
-            this.__on_select_file = function (evt) {
+            var onSelectFile = function (evt) {
                 var file,
                     target_id = this.target.id,
                     preview = this.els["preview-img"].get(0);
@@ -178,6 +118,7 @@
                 // todo : size over check
 
                 this.selected_file = file;
+
                 // 선택된 이미지 프리뷰 기능
                 (function (root) {
                     root.els["preview-img"].css({display: "block"});
@@ -252,6 +193,69 @@
 
                 /// 파일 선택하면 업로드
                 // if(file) this.upload(file);
+            };
+
+            this.init = function () {
+                this.target = $(cfg.target);
+                this.target.html(getLayout.call(this));
+
+                this.els = {
+                    "container": this.target.find('[data-ui-els="container"]'),
+                    "preview": this.target.find('[data-ui-els="preview"]'),
+                    "preview-img": this.target.find('[data-ui-els="preview-img"]'),
+                    "input-file": this.target.find('[data-ui-els="input-file"]'),
+                    "progress": this.target.find('[data-ui-els="progress"]'),
+                    "progress-bar": this.target.find('[data-ui-els="progress-bar"]')
+                };
+
+                this.els["preview"].bind("click", (function () {
+                    requestSelectFile.call(this);
+                }).bind(this));
+
+                this.els["input-file"].bind("change", (function (e) {
+                    onSelectFile.call(this, e || window.event);
+                }).bind(this));
+
+                (function () {
+
+                    var dragZone = this.els["container"],
+                        preview_img = this.els["preview-img"],
+                        _this = this, timer;
+
+                    dragZone.get(0).addEventListener('dragover', function (e) {
+                        e.stopPropagation();
+                        e.preventDefault();
+
+                        preview_img.hide();
+                        if (timer) clearTimeout(timer);
+
+                        dragZone.addClass("dragover");
+                    }, false);
+                    dragZone.get(0).addEventListener('dragleave', function (e) {
+                        e.stopPropagation();
+                        e.preventDefault();
+
+                        if (timer) clearTimeout(timer);
+                        timer = setTimeout(function () {
+                            preview_img.show();
+                        }, 100);
+
+                        dragZone.removeClass("dragover");
+                    }, false);
+
+                    dragZone.get(0).addEventListener('drop', function (e) {
+                        e.stopPropagation();
+                        e.preventDefault();
+
+                        dragZone.removeClass("dragover");
+                        onSelectFile.call(this, e || window.event);
+                    }, false);
+
+                }).call(this);
+
+                setTimeout((function () {
+                    align.call(this);
+                }).bind(this), 1);
             };
 
             this.upload = function () {
@@ -364,5 +368,7 @@
         };
         return ax5uploader;
     })());
+
+    UPLOADER = ax5.ui.uploader;
 
 })();
