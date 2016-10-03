@@ -17,7 +17,7 @@ var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol
 
     UI.addClass({
         className: "grid",
-        version: "0.2.19"
+        version: "0.3.0"
     }, function () {
         /**
          * @class ax5grid
@@ -49,6 +49,7 @@ var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol
                 lineNumberColumnWidth: 30,
                 rowSelectorColumnWidth: 26,
                 sortable: undefined,
+                remoteSort: false,
 
                 header: {
                     align: false,
@@ -306,7 +307,7 @@ var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol
                 }
             },
                 alignGrid = function alignGrid(_isFirst) {
-                // isFirst : 그리드 정렬 메소드가 처음 호출 되었는지 판단 하하는 아규먼트
+                // isFirst : 그리드 정렬 메소드가 처음 호출 되었는지 판단 하는 아규먼트
                 var CT_WIDTH = this.$["container"]["root"].width();
                 var CT_HEIGHT = this.$["container"]["root"].height();
                 var CT_INNER_WIDTH = CT_WIDTH;
@@ -535,13 +536,28 @@ var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol
                 sortColumns = function sortColumns(_sortInfo) {
                 GRID.header.repaint.call(this);
 
-                if (this.config.body.grouping) {
-                    this.list = GRID.data.initData.call(this, GRID.data.sort.call(this, _sortInfo, GRID.data.clearGroupingData.call(this, this.list)));
+                if (U.isFunction(this.config.remoteSort)) {
+                    var that = { sortInfo: [] };
+                    for (var k in _sortInfo) {
+                        that.sortInfo.push({
+                            key: k,
+                            orderBy: _sortInfo[k].orderBy,
+                            seq: _sortInfo[k].seq
+                        });
+                    }
+                    that.sortInfo.sort(function (a, b) {
+                        return a.seq > b.seq;
+                    });
+                    this.config.remoteSort.call(that, that);
                 } else {
-                    this.list = GRID.data.sort.call(this, _sortInfo, GRID.data.clearGroupingData.call(this, this.list));
+                    if (this.config.body.grouping) {
+                        this.list = GRID.data.initData.call(this, GRID.data.sort.call(this, _sortInfo, GRID.data.clearGroupingData.call(this, this.list)));
+                    } else {
+                        this.list = GRID.data.sort.call(this, _sortInfo, GRID.data.clearGroupingData.call(this, this.list));
+                    }
+                    GRID.body.repaint.call(this, true);
+                    GRID.scroller.resize.call(this);
                 }
-                GRID.body.repaint.call(this, true);
-                GRID.scroller.resize.call(this);
             };
 
             /// private end
@@ -561,7 +577,7 @@ var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol
              * @param {Number} [_config.rowSelectorColumnWidth=25]
              * @param {Boolean} [_config.sortable=false]
              * @param {Boolean} [_config.multiSort=false]
-             * @param {Boolean} [_config.remoteSort=false]
+             * @param {Function} [_config.remoteSort=false]
              * @param {Object} [_config.header]
              * @param {String} [_config.header.align]
              * @param {Number} [_config.header.columnHeight=25]
@@ -600,18 +616,82 @@ var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol
              * @param {Array} _config.columns[].editor.updateWith
              * @returns {ax5grid}
              * @example
-             * ```
+             * ```js
+             * var firstGrid = new ax5.ui.grid();
+             *
+             * ax5.ui.grid.formatter["myType"] = function () {
+             *     return "myType" + (this.value || "");
+             * };
+             * ax5.ui.grid.formatter["capital"] = function(){
+             *     return (''+this.value).toUpperCase();
+             * };
+             *
+             * ax5.ui.grid.collector["myType"] = function () {
+             *     return "myType" + (this.value || "");
+             * };
+             *
+             * var sampleData = [
+             *     {a: "A", b: "A01", price: 1000, amount: 12, cost: 12000, saleDt: "2016-08-29", customer: "장기영", saleType: "A"},
+             *     {companyJson: {"대표자명":"abcd"}, a: "A", b: "B01", price: 1100, amount: 11, cost: 12100, saleDt: "2016-08-28", customer: "장서우", saleType: "B"},
+             *     {companyJson: {"대표자명":"abcd"}, a: "A", b: "C01", price: 1200, amount: 10, cost: 12000, saleDt: "2016-08-27", customer: "이영희", saleType: "A"},
+             *     {companyJson: {"대표자명":"위세라"}, a: "A", b: "A01", price: 1300, amount: 8, cost: 10400, saleDt: "2016-08-25", customer: "황인서", saleType: "C"},
+             *     {companyJson: {"대표자명":"abcd"}, a: "A", b: "B01", price: 1400, amount: 5, cost: 7000, saleDt: "2016-08-29", customer: "황세진", saleType: "D"},
+             *     {companyJson: {"대표자명":"abcd"}, a: "A", b: "A01", price: 1500, amount: 2, cost: 3000, saleDt: "2016-08-26", customer: "이서연", saleType: "A"}
+             * ];
+             *
+             * var gridView = {
+             *     initView: function () {
+             *         firstGrid.setConfig({
+             *             target: $('[data-ax5grid="first-grid"]'),
+             *             columns: [
+             *                 {
+             *                     key: "companyJson['대표자명']",
+             *                     label: "필드A",
+             *                     width: 80,
+             *                     styleClass: function () {
+             *                         return "ABC";
+             *                     },
+             *                     enableFilter: true,
+             *                     align: "center",
+             *                     editor: {type:"text"}
+             *                 },
+             *                 {key: "b", label: "필드B", align: "center"},
+             *                 {
+             *                     key: undefined, label: "필드C", columns: [
+             *                         {key: "price", label: "단가", formatter: "money", align: "right"},
+             *                         {key: "amount", label: "수량", formatter: "money", align: "right"},
+             *                         {key: "cost", label: "금액", align: "right", formatter: "money"}
+             *                     ]
+             *                 },
+             *                 {key: "saleDt", label: "판매일자", align: "center"},
+             *                 {key: "customer", label: "고객명"},
+             *                 {key: "saleType", label: "판매타입"}
+             *             ]
+             *         });
+             *         return this;
+             *     },
+             *     setData: function (_pageNo) {
+             *
+             *         firstGrid.setData(sampleData);
+             *
+             *         return this;
+             *     }
+             * };
              * ```
              */
             this.init = function (_config) {
-                this.onStateChanged = cfg.onStateChanged;
-                this.onClick = cfg.onClick;
-
                 cfg = jQuery.extend(true, {}, cfg, _config);
                 if (!cfg.target) {
                     console.log(ax5.info.getError("ax5grid", "401", "init"));
                     return this;
                 }
+
+                // 그리드의 이벤트 정의 구간
+                this.onStateChanged = cfg.onStateChanged;
+                this.onClick = cfg.onClick;
+                this.onLoad = cfg.onLoad;
+                this.onDataChanged = cfg.body.onDataChanged;
+                // todo event에 대한 추가 정의 필요
 
                 this.$target = jQuery(cfg.target);
 
@@ -739,6 +819,15 @@ var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol
                         }
                     }
                 });
+
+                // 그리드 레이아웃이 모든 준비를 마친시점에 onLoad존재 여부를 확인하고 호출하여 줍니다.
+                setTimeout(function () {
+                    if (this.onLoad) {
+                        this.onLoad.call({
+                            self: this
+                        });
+                    }
+                }.bind(this));
                 return this;
             };
 
@@ -942,7 +1031,6 @@ var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol
              */
             this.setHeight = function (_height) {
                 //console.log(this.$target);
-
                 if (_height == "100%") {
                     _height = this.$target.offsetParent().innerHeight();
                 }
@@ -1111,8 +1199,9 @@ var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol
 
             /**
              * @method ax5grid.setColumnWidth
-             * @param _width
-             * @param _cindex
+             * @param {Number} _width
+             * @param {Number} _cindex
+             * @returns {ax5grid}
              */
             this.setColumnWidth = function (_width, _cindex) {
                 this.colGroup[this.xvar.columnResizerIndex]._width = _width;
@@ -1128,12 +1217,22 @@ var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol
             };
 
             /**
-             * @method ax5grid.getColumnSort
+             * @method ax5grid.getColumnSortInfo
              * @returns {Object} sortInfo
              */
-            this.getColumnSort = function () {
-
-                return {};
+            this.getColumnSortInfo = function () {
+                var that = { sortInfo: [] };
+                for (var k in this.sortInfo) {
+                    that.sortInfo.push({
+                        key: k,
+                        orderBy: this.sortInfo[k].orderBy,
+                        seq: this.sortInfo[k].seq
+                    });
+                }
+                that.sortInfo.sort(function (a, b) {
+                    return a.seq > b.seq;
+                });
+                return that.sortInfo;
             };
 
             /**
@@ -1198,6 +1297,7 @@ var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol
     GRID = ax5.ui.grid;
 })();
 
+// todo : remote sort
 // todo : filter
 // todo : body menu
 // todo : column reorder
@@ -2924,11 +3024,11 @@ var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol
 
         if (U.isArray(data)) {
             this.page = null;
-            this.list = initData.call(this, Object.keys(this.sortInfo).length ? sort.call(this, this.sortInfo, data) : data);
+            this.list = initData.call(this, !this.config.remoteSort && Object.keys(this.sortInfo).length ? sort.call(this, this.sortInfo, data) : data);
             this.deletedList = [];
         } else if ("page" in data) {
             this.page = jQuery.extend({}, data.page);
-            this.list = initData.call(this, Object.keys(this.sortInfo).length ? sort.call(this, this.sortInfo, data.list) : data.list);
+            this.list = initData.call(this, !this.config.remoteSort && Object.keys(this.sortInfo).length ? sort.call(this, this.sortInfo, data.list) : data.list);
             this.deletedList = [];
         }
 
@@ -2960,9 +3060,9 @@ var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol
                     }
                 }
                 break;
-            case "modified":
+            case "selected":
                 for (; i < l; i++) {
-                    if (this.list[i] && !this.list[i]["__isGrouping"] && this.list[i][this.config.columnKeys.modified]) {
+                    if (this.list[i] && !this.list[i]["__isGrouping"] && this.list[i][this.config.columnKeys.selected]) {
                         returnList.push(jQuery.extend({}, this.list[i]));
                     }
                 }
@@ -3131,6 +3231,17 @@ var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol
         } else {
             this.list[_dindex][this.config.columnKeys.modified] = true;
             this.list[_dindex][_key] = _value;
+        }
+
+        if (this.onDataChanged) {
+            this.onDataChanged.call({
+                self: this,
+                list: this.list,
+                dindex: _dindex,
+                item: this.list[_dindex],
+                key: _key,
+                value: _value
+            });
         }
         return true;
     };
@@ -3747,7 +3858,7 @@ var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol
     var U = ax5.util;
 
     var onclickPageMove = function onclickPageMove(_act) {
-        var callBack = function callBack(_pageNo) {
+        var callback = function callback(_pageNo) {
             if (this.page.currentPage != _pageNo) {
                 this.page.selectPage = _pageNo;
                 if (this.config.page.onChange) {
@@ -3761,27 +3872,27 @@ var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol
         };
         var processor = {
             "first": function first() {
-                callBack.call(this, 0);
+                callback.call(this, 0);
             },
             "prev": function prev() {
                 var pageNo = this.page.currentPage - 1;
                 if (pageNo < 0) pageNo = 0;
-                callBack.call(this, pageNo);
+                callback.call(this, pageNo);
             },
             "next": function next() {
                 var pageNo = this.page.currentPage + 1;
                 if (pageNo > this.page.totalPages - 1) pageNo = this.page.totalPages - 1;
-                callBack.call(this, pageNo);
+                callback.call(this, pageNo);
             },
             "last": function last() {
-                callBack.call(this, this.page.totalPages - 1);
+                callback.call(this, this.page.totalPages - 1);
             }
         };
 
         if (_act in processor) {
             processor[_act].call(this);
         } else {
-            callBack.call(this, _act - 1);
+            callback.call(this, _act - 1);
         }
     };
 
@@ -4316,19 +4427,25 @@ var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol
 (function () {
 
     var GRID = ax5.ui.grid;
-    var main = "<div data-ax5grid-container=\"root\" data-ax5grid-instance=\"{{instanceId}}\">\n            <div data-ax5grid-container=\"hidden\">\n                <textarea data-ax5grid-form=\"clipboard\"></textarea>\n            </div>\n            <div data-ax5grid-container=\"header\">\n                <div data-ax5grid-panel=\"aside-header\"></div>\n                <div data-ax5grid-panel=\"left-header\"></div>\n                <div data-ax5grid-panel=\"header\">\n                    <div data-ax5grid-panel-scroll=\"header\"></div>\n                </div>\n                <div data-ax5grid-panel=\"right-header\"></div>\n            </div>\n            <div data-ax5grid-container=\"body\">\n                <div data-ax5grid-panel=\"top-aside-body\"></div>\n                <div data-ax5grid-panel=\"top-left-body\"></div>\n                <div data-ax5grid-panel=\"top-body\">\n                    <div data-ax5grid-panel-scroll=\"top-body\"></div>\n                </div>\n                <div data-ax5grid-panel=\"top-right-body\"></div>\n                <div data-ax5grid-panel=\"aside-body\">\n                    <div data-ax5grid-panel-scroll=\"aside-body\"></div>\n                </div>\n                <div data-ax5grid-panel=\"left-body\">\n                    <div data-ax5grid-panel-scroll=\"left-body\"></div>\n                </div>\n                <div data-ax5grid-panel=\"body\">\n                    <div data-ax5grid-panel-scroll=\"body\"></div>\n                </div>\n                <div data-ax5grid-panel=\"right-body\">\n                  <div data-ax5grid-panel-scroll=\"right-body\"></div>\n                </div>\n                <div data-ax5grid-panel=\"bottom-aside-body\"></div>\n                <div data-ax5grid-panel=\"bottom-left-body\"></div>\n                <div data-ax5grid-panel=\"bottom-body\">\n                    <div data-ax5grid-panel-scroll=\"bottom-body\"></div>\n                </div>\n                <div data-ax5grid-panel=\"bottom-right-body\"></div>\n            </div>\n            <div data-ax5grid-container=\"page\">\n                <div data-ax5grid-page=\"holder\">\n                    <div data-ax5grid-page=\"navigation\"></div>\n                    <div data-ax5grid-page=\"status\"></div>\n                </div>\n            </div>\n            <div data-ax5grid-container=\"scroller\">\n                <div data-ax5grid-scroller=\"vertical\">\n                    <div data-ax5grid-scroller=\"vertical-bar\"></div>    \n                </div>\n                <div data-ax5grid-scroller=\"horizontal\">\n                    <div data-ax5grid-scroller=\"horizontal-bar\"></div>\n                </div>\n                <div data-ax5grid-scroller=\"corner\"></div>\n            </div>\n            <div data-ax5grid-resizer=\"vertical\"></div>\n            <div data-ax5grid-resizer=\"horizontal\"></div>\n        </div>";
+    var main = function main() {
+        return "<div data-ax5grid-container=\"root\" data-ax5grid-instance=\"{{instanceId}}\">\n            <div data-ax5grid-container=\"hidden\">\n                <textarea data-ax5grid-form=\"clipboard\"></textarea>\n            </div>\n            <div data-ax5grid-container=\"header\">\n                <div data-ax5grid-panel=\"aside-header\"></div>\n                <div data-ax5grid-panel=\"left-header\"></div>\n                <div data-ax5grid-panel=\"header\">\n                    <div data-ax5grid-panel-scroll=\"header\"></div>\n                </div>\n                <div data-ax5grid-panel=\"right-header\"></div>\n            </div>\n            <div data-ax5grid-container=\"body\">\n                <div data-ax5grid-panel=\"top-aside-body\"></div>\n                <div data-ax5grid-panel=\"top-left-body\"></div>\n                <div data-ax5grid-panel=\"top-body\">\n                    <div data-ax5grid-panel-scroll=\"top-body\"></div>\n                </div>\n                <div data-ax5grid-panel=\"top-right-body\"></div>\n                <div data-ax5grid-panel=\"aside-body\">\n                    <div data-ax5grid-panel-scroll=\"aside-body\"></div>\n                </div>\n                <div data-ax5grid-panel=\"left-body\">\n                    <div data-ax5grid-panel-scroll=\"left-body\"></div>\n                </div>\n                <div data-ax5grid-panel=\"body\">\n                    <div data-ax5grid-panel-scroll=\"body\"></div>\n                </div>\n                <div data-ax5grid-panel=\"right-body\">\n                  <div data-ax5grid-panel-scroll=\"right-body\"></div>\n                </div>\n                <div data-ax5grid-panel=\"bottom-aside-body\"></div>\n                <div data-ax5grid-panel=\"bottom-left-body\"></div>\n                <div data-ax5grid-panel=\"bottom-body\">\n                    <div data-ax5grid-panel-scroll=\"bottom-body\"></div>\n                </div>\n                <div data-ax5grid-panel=\"bottom-right-body\"></div>\n            </div>\n            <div data-ax5grid-container=\"page\">\n                <div data-ax5grid-page=\"holder\">\n                    <div data-ax5grid-page=\"navigation\"></div>\n                    <div data-ax5grid-page=\"status\"></div>\n                </div>\n            </div>\n            <div data-ax5grid-container=\"scroller\">\n                <div data-ax5grid-scroller=\"vertical\">\n                    <div data-ax5grid-scroller=\"vertical-bar\"></div>    \n                </div>\n                <div data-ax5grid-scroller=\"horizontal\">\n                    <div data-ax5grid-scroller=\"horizontal-bar\"></div>\n                </div>\n                <div data-ax5grid-scroller=\"corner\"></div>\n            </div>\n            <div data-ax5grid-resizer=\"vertical\"></div>\n            <div data-ax5grid-resizer=\"horizontal\"></div>\n        </div>";
+    };
 
-    var page_navigation = "<div data-ax5grid-page-navigation=\"holder\">\n            {{#hasPage}}\n            <div data-ax5grid-page-navigation=\"cell\">    \n                {{#firstIcon}}<button data-ax5grid-page-move=\"first\">{{{firstIcon}}}</button>{{/firstIcon}}\n                <button data-ax5grid-page-move=\"prev\">{{{prevIcon}}}</button>\n            </div>\n            <div data-ax5grid-page-navigation=\"cell-paging\">\n                {{#@paging}}\n                <button data-ax5grid-page-move=\"{{pageNo}}\" data-ax5grid-page-selected=\"{{selected}}\">{{pageNo}}</button>\n                {{/@paging}}\n            </div>\n            <div data-ax5grid-page-navigation=\"cell\">\n                <button data-ax5grid-page-move=\"next\">{{{nextIcon}}}</button>\n                {{#lastIcon}}<button data-ax5grid-page-move=\"last\">{{{lastIcon}}}</button>{{/lastIcon}}\n            </div>\n            {{/hasPage}}\n        </div>";
+    var page_navigation = function page_navigation() {
+        return "<div data-ax5grid-page-navigation=\"holder\">\n            {{#hasPage}}\n            <div data-ax5grid-page-navigation=\"cell\">    \n                {{#firstIcon}}<button data-ax5grid-page-move=\"first\">{{{firstIcon}}}</button>{{/firstIcon}}\n                <button data-ax5grid-page-move=\"prev\">{{{prevIcon}}}</button>\n            </div>\n            <div data-ax5grid-page-navigation=\"cell-paging\">\n                {{#@paging}}\n                <button data-ax5grid-page-move=\"{{pageNo}}\" data-ax5grid-page-selected=\"{{selected}}\">{{pageNo}}</button>\n                {{/@paging}}\n            </div>\n            <div data-ax5grid-page-navigation=\"cell\">\n                <button data-ax5grid-page-move=\"next\">{{{nextIcon}}}</button>\n                {{#lastIcon}}<button data-ax5grid-page-move=\"last\">{{{lastIcon}}}</button>{{/lastIcon}}\n            </div>\n            {{/hasPage}}\n        </div>";
+    };
 
-    var page_status = "<span>{{fromRowIndex}} - {{toRowIndex}} of {{totalElements}}</span>";
+    var page_status = function page_status() {
+        return "<span>{{fromRowIndex}} - {{toRowIndex}} of {{totalElements}}</span>";
+    };
 
     GRID.tmpl = {
         "main": main,
         "page_navigation": page_navigation,
         "page_status": page_status,
 
-        get: function get(tmplName, data) {
-            return ax5.mustache.render(GRID.tmpl[tmplName], data);
+        get: function get(tmplName, data, columnKeys) {
+            return ax5.mustache.render(GRID.tmpl[tmplName].call(this, columnKeys), data);
         }
     };
 })();
@@ -4344,6 +4461,7 @@ var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol
      * @param _frozenColumnIndex
      * @returns {{leftHeaderData: {rows: Array}, headerData: {rows: Array}}}
      */
+
     var divideTableByFrozenColumnIndex = function divideTableByFrozenColumnIndex(_table, _frozenColumnIndex) {
         var tempTable_l = { rows: [] };
         var tempTable_r = { rows: [] };

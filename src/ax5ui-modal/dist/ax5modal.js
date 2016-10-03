@@ -5,18 +5,54 @@
 
     var UI = ax5.ui;
     var U = ax5.util;
+    var MODAL;
 
     UI.addClass({
         className: "modal",
-        version: "0.7.8"
+        version: "0.8.1"
     }, function () {
         /**
          * @class ax5modal
          * @alias ax5.ui.modal
          * @author tom@axisj.com
          * @example
-         * ```
-         * var my_modal = new ax5.ui.modal();
+         * ```js
+         * var modal = new ax5.ui.modal({
+         *     iframeLoadingMsg: '<i class="fa fa-spinner fa-5x fa-spin" aria-hidden="true"></i>',
+         *     header: {
+         *         title: "MODAL TITLE",
+         *         btns: {
+         *             minimize: {
+         *                 label: '<i class="fa fa-minus-circle" aria-hidden="true"></i>', onClick: function () {
+         *                     modal.minimize();
+         *                 }
+         *             },
+         *             maximize: {
+         *                 label: '<i class="fa fa-plus-circle" aria-hidden="true"></i>', onClick: function () {
+         *                     modal.maximize();
+         *                 }
+         *             },
+         *             close: {
+         *                 label: '<i class="fa fa-times-circle" aria-hidden="true"></i>', onClick: function () {
+         *                     modal.close();
+         *                 }
+         *             }
+         *         }
+         *     }
+         * });
+         *
+         * modal.open({
+         *     width: 800,
+         *     height: 600,
+         *     fullScreen: function(){
+         *         return ($(window).width() < 600);
+         *     },
+         *     iframe: {
+         *         method: "get",
+         *         url: "http://chequer-app:2017/html/login.html",
+         *         param: "callback=modalCallback"
+         *     }
+         * });
          * ```
          */
         var ax5modal = function ax5modal() {
@@ -67,9 +103,6 @@
                 }
                 return true;
             },
-                getContentTmpl = function getContentTmpl() {
-                return " \n                    <div id=\"{{modalId}}\" data-modal-els=\"root\" class=\"ax5modal {{theme}} {{fullscreen}}\" style=\"{{styles}}\">\n                        {{#header}}\n                        <div class=\"ax-modal-header\" data-modal-els=\"header\">\n                            {{{title}}}\n                            {{#btns}}\n                                <div class=\"ax-modal-header-addon\">\n                                {{#@each}}\n                                <a tabindex=\"-1\" data-modal-header-btn=\"{{@key}}\" class=\"{{@value.theme}}\">{{{@value.label}}}</a>\n                                {{/@each}}\n                                </div>\n                            {{/btns}}\n                        </div>\n                        {{/header}}\n                        <div class=\"ax-modal-body\" data-modal-els=\"body\">\n                        {{#iframe}}\n                        \n                            <div data-modal-els=\"iframe-wrap\" style=\"-webkit-overflow-scrolling: touch; overflow: auto;position: relative;\">\n                                <table data-modal-els=\"iframe-loading\" style=\"width:100%;height:100%;\"><tr><td style=\"text-align: center;vertical-align: middle\">{{{iframeLoadingMsg}}}</td></tr></table>\n                                <iframe name=\"{{modalId}}-frame\" src=\"\" width=\"100%\" height=\"100%\" frameborder=\"0\" data-modal-els=\"iframe\" style=\"position: absolute;left:0;top:0;\"></iframe>\n                            </div>\n                            <form name=\"{{modalId}}-form\" data-modal-els=\"iframe-form\">\n                            <input type=\"hidden\" name=\"modalId\" value=\"{{modalId}}\" />\n                            {{#param}}\n                            {{#@each}}\n                            <input type=\"hidden\" name=\"{{@key}}\" value=\"{{@value}}\" />\n                            {{/@each}}\n                            {{/param}}\n                            </form>\n                        {{/iframe}}\n                        </div>\n                    </div>\n                    ";
-            },
                 getContent = function getContent(modalId, opts) {
                 var data = {
                     modalId: modalId,
@@ -88,9 +121,9 @@
                     data.iframe.param = ax5.util.param(data.iframe.param);
                 }
 
-                return ax5.mustache.render(getContentTmpl(), data);
+                return MODAL.tmpl.get.call(this, "content", data, {});
             },
-                open = function open(opts, callBack) {
+                open = function open(opts, callback) {
                 var that;
                 jQuery(document.body).append(getContent.call(this, opts.id, opts));
 
@@ -144,7 +177,7 @@
                     this.$["iframe-form"].submit();
                 }
 
-                if (callBack) callBack.call(that);
+                if (callback) callback.call(that);
                 onStateChanged.call(this, opts, that);
 
                 // bind key event
@@ -162,14 +195,23 @@
                 }.bind(this));
 
                 this.$.header.bind(ENM["mousedown"], function (e) {
-                    self.mousePosition = getMousePosition(e);
-                    moveModal.on.call(self);
+                    /// 이벤트 필터링 추가 : 버튼엘리먼트로 부터 발생된 이벤트이면 moveModal 시작하지 않도록 필터링
+                    var isButton = U.findParentNode(e.target, function (_target) {
+                        if (_target.getAttribute("data-modal-header-btn")) {
+                            return true;
+                        }
+                    });
+
+                    if (!isButton) {
+                        self.mousePosition = getMousePosition(e);
+                        moveModal.on.call(self);
+                    }
                 }).bind("dragstart", function (e) {
                     U.stopEvent(e);
                     return false;
                 });
             },
-                btnOnClick = function btnOnClick(e, opts, callBack, target, k) {
+                btnOnClick = function btnOnClick(e, opts, callback, target, k) {
                 var that;
                 if (e.srcElement) e.target = e.srcElement;
 
@@ -196,7 +238,7 @@
 
                 that = null;
                 opts = null;
-                callBack = null;
+                callback = null;
                 target = null;
                 k = null;
             },
@@ -224,6 +266,7 @@
             },
                 moveModal = {
                 "on": function on() {
+                    var modalZIndex = this.activeModal.css("z-index");
                     var modalOffset = this.activeModal.position();
                     var modalBox = {
                         width: this.activeModal.outerWidth(), height: this.activeModal.outerHeight()
@@ -267,11 +310,13 @@
                             // self.resizerBg : body 가 window보다 작을 때 문제 해결을 위한 DIV
                             self.resizerBg = jQuery('<div class="ax5modal-resizer-background" ondragstart="return false;"></div>');
                             self.resizer = jQuery('<div class="ax5modal-resizer" ondragstart="return false;"></div>');
+                            self.resizerBg.css({ zIndex: modalZIndex });
                             self.resizer.css({
                                 left: modalOffset.left,
                                 top: modalOffset.top,
                                 width: modalBox.width,
-                                height: modalBox.height
+                                height: modalBox.height,
+                                zIndex: modalZIndex + 1
                             });
                             jQuery(document.body).append(self.resizerBg).append(self.resizer);
                             self.activeModal.addClass("draged");
@@ -335,10 +380,10 @@
              * my_modal.open();
              * ```
              */
-            this.open = function (opts, callBack) {
+            this.open = function (opts, callback) {
                 if (!this.activeModal) {
                     opts = self.modalConfig = jQuery.extend(true, {}, cfg, opts);
-                    open.call(this, opts, callBack);
+                    open.call(this, opts, callback);
                 }
                 return this;
             };
@@ -370,6 +415,9 @@
                         });
                     }.bind(this), cfg.animateTime);
                 }
+
+                this.minimized = false; // hoksi
+
                 return this;
             };
 
@@ -380,18 +428,23 @@
             this.minimize = function () {
 
                 return function (minimizePosition) {
-                    var opts = self.modalConfig;
-                    if (typeof minimizePosition === "undefined") minimizePosition = cfg.minimizePosition;
-                    this.minimized = true;
-                    this.$.body.hide();
-                    self.modalConfig.originalHeight = opts.height;
-                    self.modalConfig.height = 0;
-                    alignProcessor[minimizePosition].call(this);
 
-                    onStateChanged.call(this, opts, {
-                        self: this,
-                        state: "minimize"
-                    });
+                    if (this.minimized !== true) {
+
+                        var opts = self.modalConfig;
+                        if (typeof minimizePosition === "undefined") minimizePosition = cfg.minimizePosition;
+
+                        this.minimized = true;
+                        this.$.body.hide();
+                        self.modalConfig.originalHeight = opts.height;
+                        self.modalConfig.height = 0;
+                        alignProcessor[minimizePosition].call(this);
+
+                        onStateChanged.call(this, opts, {
+                            self: this,
+                            state: "minimize"
+                        });
+                    }
 
                     return this;
                 };
@@ -541,4 +594,22 @@
         };
         return ax5modal;
     }());
+
+    MODAL = ax5.ui.modal;
+})();
+// ax5.ui.modal.tmpl
+(function () {
+    var MODAL = ax5.ui.modal;
+
+    var content = function content() {
+        return " \n        <div id=\"{{modalId}}\" data-modal-els=\"root\" class=\"ax5modal {{theme}} {{fullscreen}}\" style=\"{{styles}}\">\n            {{#header}}\n            <div class=\"ax-modal-header\" data-modal-els=\"header\">\n                {{{title}}}\n                {{#btns}}\n                    <div class=\"ax-modal-header-addon\">\n                    {{#@each}}\n                    <button tabindex=\"-1\" data-modal-header-btn=\"{{@key}}\" class=\"{{@value.theme}}\">{{{@value.label}}}</button>\n                    {{/@each}}\n                    </div>\n                {{/btns}}\n            </div>\n            {{/header}}\n            <div class=\"ax-modal-body\" data-modal-els=\"body\">\n            {{#iframe}}\n            \n                <div data-modal-els=\"iframe-wrap\" style=\"-webkit-overflow-scrolling: touch; overflow: auto;position: relative;\">\n                    <table data-modal-els=\"iframe-loading\" style=\"width:100%;height:100%;\"><tr><td style=\"text-align: center;vertical-align: middle\">{{{iframeLoadingMsg}}}</td></tr></table>\n                    <iframe name=\"{{modalId}}-frame\" src=\"\" width=\"100%\" height=\"100%\" frameborder=\"0\" data-modal-els=\"iframe\" style=\"position: absolute;left:0;top:0;\"></iframe>\n                </div>\n                <form name=\"{{modalId}}-form\" data-modal-els=\"iframe-form\">\n                <input type=\"hidden\" name=\"modalId\" value=\"{{modalId}}\" />\n                {{#param}}\n                {{#@each}}\n                <input type=\"hidden\" name=\"{{@key}}\" value=\"{{@value}}\" />\n                {{/@each}}\n                {{/param}}\n                </form>\n            {{/iframe}}\n            </div>\n            <div class=\"ax-modal-body-mask\"></div>\n        </div>\n        ";
+    };
+
+    MODAL.tmpl = {
+        "content": content,
+
+        get: function get(tmplName, data, columnKeys) {
+            return ax5.mustache.render(MODAL.tmpl[tmplName].call(this, columnKeys), data);
+        }
+    };
 })();

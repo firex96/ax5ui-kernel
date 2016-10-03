@@ -3,18 +3,54 @@
 
     var UI = ax5.ui;
     var U = ax5.util;
+    var MODAL;
 
     UI.addClass({
         className: "modal",
-        version  : "0.7.8"
+        version: "0.8.1"
     }, (function () {
         /**
          * @class ax5modal
          * @alias ax5.ui.modal
          * @author tom@axisj.com
          * @example
-         * ```
-         * var my_modal = new ax5.ui.modal();
+         * ```js
+         * var modal = new ax5.ui.modal({
+         *     iframeLoadingMsg: '<i class="fa fa-spinner fa-5x fa-spin" aria-hidden="true"></i>',
+         *     header: {
+         *         title: "MODAL TITLE",
+         *         btns: {
+         *             minimize: {
+         *                 label: '<i class="fa fa-minus-circle" aria-hidden="true"></i>', onClick: function () {
+         *                     modal.minimize();
+         *                 }
+         *             },
+         *             maximize: {
+         *                 label: '<i class="fa fa-plus-circle" aria-hidden="true"></i>', onClick: function () {
+         *                     modal.maximize();
+         *                 }
+         *             },
+         *             close: {
+         *                 label: '<i class="fa fa-times-circle" aria-hidden="true"></i>', onClick: function () {
+         *                     modal.close();
+         *                 }
+         *             }
+         *         }
+         *     }
+         * });
+         *
+         * modal.open({
+         *     width: 800,
+         *     height: 600,
+         *     fullScreen: function(){
+         *         return ($(window).width() < 600);
+         *     },
+         *     iframe: {
+         *         method: "get",
+         *         url: "http://chequer-app:2017/html/login.html",
+         *         param: "callback=modalCallback"
+         *     }
+         * });
          * ```
          */
         var ax5modal = function () {
@@ -24,7 +60,7 @@
                 ENM = {
                     "mousedown": (ax5.info.supportTouch) ? "touchstart" : "mousedown",
                     "mousemove": (ax5.info.supportTouch) ? "touchmove" : "mousemove",
-                    "mouseup"  : (ax5.info.supportTouch) ? "touchend" : "mouseup"
+                    "mouseup": (ax5.info.supportTouch) ? "touchend" : "mouseup"
                 },
                 getMousePosition = function (e) {
                     var mouseObj = e;
@@ -39,19 +75,19 @@
 
             this.instanceId = ax5.getGuid();
             this.config = {
-                id              : 'ax5-modal-' + this.instanceId,
-                position        : {
-                    left  : "center",
-                    top   : "middle",
+                id: 'ax5-modal-' + this.instanceId,
+                position: {
+                    left: "center",
+                    top: "middle",
                     margin: 10
                 },
                 minimizePosition: "bottom-right",
-                clickEventName  : "click", //(('ontouchstart' in document.documentElement) ? "touchstart" : "click"),
-                theme           : 'default',
-                width           : 300,
-                height          : 400,
-                closeToEsc      : true,
-                animateTime     : 250
+                clickEventName: "click", //(('ontouchstart' in document.documentElement) ? "touchstart" : "click"),
+                theme: 'default',
+                width: 300,
+                height: 400,
+                closeToEsc: true,
+                animateTime: 250
             };
             this.activeModal = null;
             this.$ = {}; // UI inside of the jQuery object store
@@ -68,50 +104,15 @@
                     }
                     return true;
                 },
-                getContentTmpl = function () {
-                    return ` 
-                    <div id="{{modalId}}" data-modal-els="root" class="ax5modal {{theme}} {{fullscreen}}" style="{{styles}}">
-                        {{#header}}
-                        <div class="ax-modal-header" data-modal-els="header">
-                            {{{title}}}
-                            {{#btns}}
-                                <div class="ax-modal-header-addon">
-                                {{#@each}}
-                                <a tabindex="-1" data-modal-header-btn="{{@key}}" class="{{@value.theme}}">{{{@value.label}}}</a>
-                                {{/@each}}
-                                </div>
-                            {{/btns}}
-                        </div>
-                        {{/header}}
-                        <div class="ax-modal-body" data-modal-els="body">
-                        {{#iframe}}
-                        
-                            <div data-modal-els="iframe-wrap" style="-webkit-overflow-scrolling: touch; overflow: auto;position: relative;">
-                                <table data-modal-els="iframe-loading" style="width:100%;height:100%;"><tr><td style="text-align: center;vertical-align: middle">{{{iframeLoadingMsg}}}</td></tr></table>
-                                <iframe name="{{modalId}}-frame" src="" width="100%" height="100%" frameborder="0" data-modal-els="iframe" style="position: absolute;left:0;top:0;"></iframe>
-                            </div>
-                            <form name="{{modalId}}-form" data-modal-els="iframe-form">
-                            <input type="hidden" name="modalId" value="{{modalId}}" />
-                            {{#param}}
-                            {{#@each}}
-                            <input type="hidden" name="{{@key}}" value="{{@value}}" />
-                            {{/@each}}
-                            {{/param}}
-                            </form>
-                        {{/iframe}}
-                        </div>
-                    </div>
-                    `;
-                },
                 getContent = function (modalId, opts) {
                     var
                         data = {
-                            modalId         : modalId,
-                            theme           : opts.theme,
-                            header          : opts.header,
-                            fullScreen      : (opts.fullScreen ? "fullscreen" : ""),
-                            styles          : [],
-                            iframe          : opts.iframe,
+                            modalId: modalId,
+                            theme: opts.theme,
+                            header: opts.header,
+                            fullScreen: (opts.fullScreen ? "fullscreen" : ""),
+                            styles: [],
+                            iframe: opts.iframe,
                             iframeLoadingMsg: opts.iframeLoadingMsg
                         };
 
@@ -122,9 +123,9 @@
                         data.iframe.param = ax5.util.param(data.iframe.param);
                     }
 
-                    return ax5.mustache.render(getContentTmpl(), data);
+                    return MODAL.tmpl.get.call(this, "content", data, {});
                 },
-                open = function (opts, callBack) {
+                open = function (opts, callback) {
                     var that;
                     jQuery(document.body).append(getContent.call(this, opts.id, opts));
 
@@ -132,9 +133,9 @@
 
                     // 파트수집
                     this.$ = {
-                        "root"  : this.activeModal.find('[data-modal-els="root"]'),
+                        "root": this.activeModal.find('[data-modal-els="root"]'),
                         "header": this.activeModal.find('[data-modal-els="header"]'),
-                        "body"  : this.activeModal.find('[data-modal-els="body"]')
+                        "body": this.activeModal.find('[data-modal-els="body"]')
                     };
 
                     if (opts.iframe) {
@@ -148,13 +149,13 @@
                     this.align();
 
                     that = {
-                        self  : this,
-                        id    : opts.id,
-                        theme : opts.theme,
-                        width : opts.width,
+                        self: this,
+                        id: opts.id,
+                        theme: opts.theme,
+                        width: opts.width,
                         height: opts.height,
-                        state : "open",
-                        $     : this.$
+                        state: "open",
+                        $: this.$
                     };
 
                     if (opts.iframe) {
@@ -178,7 +179,7 @@
                         this.$["iframe-form"].submit();
                     }
 
-                    if (callBack) callBack.call(that);
+                    if (callback) callback.call(that);
                     onStateChanged.call(this, opts, that);
 
                     // bind key event
@@ -197,15 +198,24 @@
 
                     this.$.header
                         .bind(ENM["mousedown"], function (e) {
-                            self.mousePosition = getMousePosition(e);
-                            moveModal.on.call(self);
+                            /// 이벤트 필터링 추가 : 버튼엘리먼트로 부터 발생된 이벤트이면 moveModal 시작하지 않도록 필터링
+                            var isButton = U.findParentNode(e.target, function (_target) {
+                                if (_target.getAttribute("data-modal-header-btn")) {
+                                    return true;
+                                }
+                            });
+
+                            if (!isButton) {
+                                self.mousePosition = getMousePosition(e);
+                                moveModal.on.call(self);
+                            }
                         })
                         .bind("dragstart", function (e) {
                             U.stopEvent(e);
                             return false;
                         });
                 },
-                btnOnClick = function (e, opts, callBack, target, k) {
+                btnOnClick = function (e, opts, callback, target, k) {
                     var that;
                     if (e.srcElement) e.target = e.srcElement;
 
@@ -219,10 +229,10 @@
                         k = target.getAttribute("data-modal-header-btn");
 
                         that = {
-                            self         : this,
+                            self: this,
                             key: k, value: opts.header.btns[k],
-                            dialogId     : opts.id,
-                            btnTarget    : target
+                            dialogId: opts.id,
+                            btnTarget: target
                         };
 
                         if (opts.header.btns[k].onClick) {
@@ -232,7 +242,7 @@
 
                     that = null;
                     opts = null;
-                    callBack = null;
+                    callback = null;
                     target = null;
                     k = null;
                 },
@@ -242,16 +252,16 @@
                     }
                 },
                 alignProcessor = {
-                    "top-left"     : function () {
+                    "top-left": function () {
                         this.align({left: "left", top: "top"});
                     },
-                    "top-right"    : function () {
+                    "top-right": function () {
                         this.align({left: "right", top: "top"});
                     },
-                    "bottom-left"  : function () {
+                    "bottom-left": function () {
                         this.align({left: "left", top: "bottom"});
                     },
-                    "bottom-right" : function () {
+                    "bottom-right": function () {
                         this.align({left: "right", top: "bottom"});
                     },
                     "center-middle": function () {
@@ -259,13 +269,14 @@
                     }
                 },
                 moveModal = {
-                    "on" : function () {
+                    "on": function () {
+                        var modalZIndex = this.activeModal.css("z-index");
                         var modalOffset = this.activeModal.position();
                         var modalBox = {
                             width: this.activeModal.outerWidth(), height: this.activeModal.outerHeight()
                         };
                         var windowBox = {
-                            width : jQuery(window).width(),
+                            width: jQuery(window).width(),
                             height: jQuery(window).height()
                         };
                         var getResizerPosition = function (e) {
@@ -293,7 +304,7 @@
 
                             return {
                                 left: modalOffset.left + self.__dx + $(document).scrollLeft(),
-                                top : modalOffset.top + self.__dy + $(document).scrollTop()
+                                top: modalOffset.top + self.__dy + $(document).scrollTop()
                             };
                         };
 
@@ -306,11 +317,13 @@
                                     // self.resizerBg : body 가 window보다 작을 때 문제 해결을 위한 DIV
                                     self.resizerBg = jQuery('<div class="ax5modal-resizer-background" ondragstart="return false;"></div>');
                                     self.resizer = jQuery('<div class="ax5modal-resizer" ondragstart="return false;"></div>');
+                                    self.resizerBg.css({zIndex: modalZIndex});
                                     self.resizer.css({
-                                        left  : modalOffset.left,
-                                        top   : modalOffset.top,
-                                        width : modalBox.width,
-                                        height: modalBox.height
+                                        left: modalOffset.left,
+                                        top: modalOffset.top,
+                                        width: modalBox.width,
+                                        height: modalBox.height,
+                                        zIndex: modalZIndex + 1
                                     });
                                     jQuery(document.body)
                                         .append(self.resizerBg)
@@ -388,10 +401,10 @@
              * my_modal.open();
              * ```
              */
-            this.open = function (opts, callBack) {
+            this.open = function (opts, callback) {
                 if (!this.activeModal) {
                     opts = self.modalConfig = jQuery.extend(true, {}, cfg, opts);
-                    open.call(this, opts, callBack);
+                    open.call(this, opts, callback);
                 }
                 return this;
             };
@@ -413,16 +426,19 @@
                     jQuery(window).unbind("resize.ax-modal");
 
                     setTimeout((function () {
-                        if(this.activeModal) {
+                        if (this.activeModal) {
                             this.activeModal.remove();
                             this.activeModal = null;
                         }
                         onStateChanged.call(this, opts, {
-                            self : this,
+                            self: this,
                             state: "close"
                         });
                     }).bind(this), cfg.animateTime);
                 }
+
+                this.minimized = false; // hoksi
+
                 return this;
             };
 
@@ -433,18 +449,23 @@
             this.minimize = (function () {
 
                 return function (minimizePosition) {
-                    var opts = self.modalConfig;
-                    if (typeof minimizePosition === "undefined") minimizePosition = cfg.minimizePosition;
-                    this.minimized = true;
-                    this.$.body.hide();
-                    self.modalConfig.originalHeight = opts.height;
-                    self.modalConfig.height = 0;
-                    alignProcessor[minimizePosition].call(this);
 
-                    onStateChanged.call(this, opts, {
-                        self : this,
-                        state: "minimize"
-                    });
+                    if (this.minimized !== true) {
+
+                        var opts = self.modalConfig;
+                        if (typeof minimizePosition === "undefined") minimizePosition = cfg.minimizePosition;
+
+                        this.minimized = true;
+                        this.$.body.hide();
+                        self.modalConfig.originalHeight = opts.height;
+                        self.modalConfig.height = 0;
+                        alignProcessor[minimizePosition].call(this);
+
+                        onStateChanged.call(this, opts, {
+                            self: this,
+                            state: "minimize"
+                        });
+                    }
 
                     return this;
                 };
@@ -464,7 +485,7 @@
 
                     this.align({left: "center", top: "middle"});
                     onStateChanged.call(this, opts, {
-                        self : this,
+                        self: this,
                         state: "restore"
                     });
                 }
@@ -518,14 +539,14 @@
 
                     var opts = self.modalConfig,
                         box = {
-                            width : opts.width,
+                            width: opts.width,
                             height: opts.height
                         };
 
-                    var fullScreen = (function(_fullScreen){
-                        if(typeof _fullScreen === "undefined"){
+                    var fullScreen = (function (_fullScreen) {
+                        if (typeof _fullScreen === "undefined") {
                             return false;
-                        }else if(U.isFunction(_fullScreen)){
+                        } else if (U.isFunction(_fullScreen)) {
                             return _fullScreen();
                         }
                     })(opts.fullScreen);
@@ -574,8 +595,8 @@
                         else {
                             box.top = opts.position.top || 0;
                         }
-                        if(box.left < 0) box.left = 0;
-                        if(box.top < 0) box.top = 0;
+                        if (box.left < 0) box.left = 0;
+                        if (box.top < 0) box.top = 0;
                     }
 
                     this.activeModal.css(box);
@@ -603,4 +624,5 @@
         return ax5modal;
     })());
 
+    MODAL = ax5.ui.modal;
 })();

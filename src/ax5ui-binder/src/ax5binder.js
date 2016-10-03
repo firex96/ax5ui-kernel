@@ -14,8 +14,42 @@
          * @classdesc
          * @author tom@axisj.com
          * @example
-         * ```
+         * ```js
+         * var obj = {
+         *     name: "Thomas Jang",
+         *     alias: "tom",
+         *     tel: "010-8881-9137",
+         *     email: "tom@axisj.com",
+         *     sex: "M",
+         *     hobby: ["sport"],
+         *     useYn: "N",
+         *     description: "http://www.axisj.com",
+         *     list: [
+         *         {
+         *             name: "thomas",
+         *             tel: "010-8881-9000",
+         *             email: "tom@axisj.com",
+         *             sex: "M",
+         *             description: "",
+         *             child: [{name:"값1"},{name:"값2"}],
+         *             qty: 10,
+         *             cost: 100
+         *         },
+         *         {
+         *             name: "thomas",
+         *             tel: "010-8881-9000",
+         *             email: "tom@axisj.com",
+         *             sex: "M",
+         *             description: "",
+         *             child: [{name:"값1"},{name:"값2"}],
+         *             qty: 20,
+         *             cost: 100
+         *         }
+         * ]
+         * };
+         *
          * var myBinder = new ax5.ui.binder();
+         * myBinder.setModel(obj, $('#form-target'));
          * ```
          */
         var ax5binder = function () {
@@ -178,10 +212,10 @@
 
 
             /**
-             * data_path에 값이 변경되는 이벤트 발생하면 callBack을 실행합니다.
+             * data_path에 값이 변경되는 이벤트 발생하면 callback을 실행합니다.
              * @method ax5binder.onChange
              * @param dataPath
-             * @param callBack
+             * @param callback
              * @returns {ax5binder}
              * @example
              * ```js
@@ -199,16 +233,16 @@
              *   });
              * ```
              */
-            this.onChange = function (dataPath, callBack) {
-                this.change_trigger[dataPath || "*"] = callBack;
+            this.onChange = function (dataPath, callback) {
+                this.change_trigger[dataPath || "*"] = callback;
                 return this;
             };
 
             /**
-             * data-ax-repeat="list" 속성이 부여된 엘리먼트 하위에 태그중에 data-ax-repeat-click 속성을 가진 아이템에 대해 클릭 이벤트 발생하면 callBack을 실행합니다.
+             * data-ax-repeat="list" 속성이 부여된 엘리먼트 하위에 태그중에 data-ax-repeat-click 속성을 가진 아이템에 대해 클릭 이벤트 발생하면 callback을 실행합니다.
              * @method ax5binder.onClick
              * @param dataPath
-             * @param callBack
+             * @param callback
              * @returns {ax5binder}
              * @example
              * ```js
@@ -225,8 +259,8 @@
              *   });
              * ```
              */
-            this.onClick = function (dataPath, callBack) {
-                this.click_trigger[dataPath] = callBack;
+            this.onClick = function (dataPath, callback) {
+                this.click_trigger[dataPath] = callback;
                 return this;
             };
 
@@ -260,14 +294,14 @@
 
                 this.change("*");
 
-                var callBack = this.update_trigger[dataPath];
-                if (callBack) {
+                var callback = this.update_trigger[dataPath];
+                if (callback) {
                     var that = {
                         repeat_path: dataPath,
                         tmpl       : tmpl,
                         list       : list
                     };
-                    callBack.call(that, that);
+                    callback.call(that, that);
                 }
 
                 return this;
@@ -303,14 +337,14 @@
 
                 this.change("*");
 
-                var callBack = this.update_trigger[dataPath];
-                if (callBack) {
+                var callback = this.update_trigger[dataPath];
+                if (callback) {
                     var that = {
                         repeat_path: dataPath,
                         tmpl       : tmpl,
                         list       : list
                     };
-                    callBack.call(that, that);
+                    callback.call(that, that);
                 }
 
                 return this;
@@ -340,14 +374,14 @@
 
                 this.change("*");
 
-                var callBack = this.update_trigger[dataPath];
-                if (callBack) {
+                var callback = this.update_trigger[dataPath];
+                if (callback) {
                     var that = {
                         repeat_path: dataPath,
                         tmpl       : tmpl,
                         list       : list
                     };
-                    callBack.call(that, that);
+                    callback.call(that, that);
                 }
 
                 return this;
@@ -425,7 +459,7 @@
             /**
              * @method ax5binder.onUpdate
              * @param dataPath
-             * @param callBack
+             * @param callback
              * @returns {ax5binder}
              * @example
              * ```js
@@ -437,8 +471,8 @@
              *  });
              * ```
              */
-            this.onUpdate = function (dataPath, callBack) {
-                this.update_trigger[dataPath] = callBack;
+            this.onUpdate = function (dataPath, callback) {
+                this.update_trigger[dataPath] = callback;
                 return this;
             };
 
@@ -570,20 +604,20 @@
                  */
 
                 //_this.tmpl
-                var callBack;
+                var callback;
                 for (var tk in _this.tmpl) {
                     for (var ix in _this.tmpl[tk]) {
                         // console.log(_this.tmpl[tk][ix].content);
                         this.print_tmpl(tk, _this.tmpl[tk][ix], "isInit");
                     }
 
-                    if (callBack = this.update_trigger[tk]) {
+                    if (callback = this.update_trigger[tk]) {
                         var that = {
                             repeat_path: tk,
                             tmpl       : _this.tmpl[tk],
                             list       : (Function("", "return this." + tk + ";")).call(this.model)
                         };
-                        callBack.call(that, that);
+                        callback.call(that, that);
                     }
                 }
             };
@@ -663,9 +697,9 @@
             };
 
             this.change = function (dataPath, that) {
-                var callBack = this.change_trigger[dataPath];
-                if (callBack) {
-                    callBack.call(that, that);
+                var callback = this.change_trigger[dataPath];
+                if (callback) {
+                    callback.call(that, that);
                 }
                 if (dataPath != "*" && this.change_trigger["*"]) {
                     this.change_trigger["*"].call(that, that);
@@ -673,9 +707,9 @@
             };
 
             this.click = function (dataPath, that) {
-                var callBack = this.click_trigger[dataPath];
-                if (callBack) {
-                    callBack.call(that, that);
+                var callback = this.click_trigger[dataPath];
+                if (callback) {
+                    callback.call(that, that);
                 }
             };
 

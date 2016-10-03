@@ -23,37 +23,41 @@
     <div data-ax5grid="first-grid" data-ax5grid-config='{showLineNumber: true, showRowSelector: true}' style="height: 100%;"></div>
 </div>
 
-<div style="padding: 10px;">
-    <button class="btn btn-default" data-set-height="300">높이조절(300px)</button>
-    <button class="btn btn-default" data-set-height="400">높이조절(400px)</button>
-    <button class="btn btn-default" data-set-height="800">높이조절(800px)</button>
-    <button class="btn btn-default" data-set-height="100%">높이조절(100%)</button>
+<div style="padding: 5px;">
+    <h3>height</h3>
+    <button class="btn btn-default" data-set-height="300">300px</button>
+    <button class="btn btn-default" data-set-height="400">400px</button>
+    <button class="btn btn-default" data-set-height="800">800px</button>
+    <button class="btn btn-default" data-set-height="100%">100%</button>
 </div>
-<div style="padding: 10px;">
-    <button class="btn btn-default" data-grid-control="row-add">row add</button>
-    <button class="btn btn-default" data-grid-control="row-remove">row remove</button>
-    <button class="btn btn-default" data-grid-control="row-update">row update</button>
+<div style="padding: 5px;">
+    <h3>row</h3>
+    <button class="btn btn-default" data-grid-control="row-add">add</button>
+    <button class="btn btn-default" data-grid-control="row-remove">remove</button>
+    <button class="btn btn-default" data-grid-control="row-update">update</button>
 </div>
-<div style="padding: 10px;">
-    <button class="btn btn-default" data-grid-control="column-add">column add</button>
-    <button class="btn btn-default" data-grid-control="column-remove">column remove</button>
-    <button class="btn btn-default" data-grid-control="column-update">column update</button>
+<div style="padding: 5px;">
+    <h3>column</h3>
+    <button class="btn btn-default" data-grid-control="column-add">add</button>
+    <button class="btn btn-default" data-grid-control="column-remove">remove</button>
+    <button class="btn btn-default" data-grid-control="column-update">update</button>
 </div>
-
-<div style="padding: 10px;">
+<div style="padding: 5px;">
+    <h3>etc.</h3>
     <button class="btn btn-default" data-grid-control="width-resize">width resize</button>
+    <button class="btn btn-default" data-grid-control="delete-all">delete all</button>
 </div>
 
 <script>
 
-    
+
     var firstGrid = new ax5.ui.grid();
 
     ax5.ui.grid.formatter["myType"] = function () {
         return "myType" + (this.value || "");
     };
-    ax5.ui.grid.formatter["capital"] = function(){
-        return (''+this.value).toUpperCase();
+    ax5.ui.grid.formatter["capital"] = function () {
+        return ('' + this.value).toUpperCase();
     };
 
     ax5.ui.grid.collector["myType"] = function () {
@@ -61,18 +65,37 @@
     };
 
     var sampleData = [
-        {a: "A", b: "A01", price: 1000, amount: 12, cost: 12000, saleDt: "2016-08-29", customer: "장기영", saleType: "A"},
-        {companyJson: {"대표자명":"abcd"}, a: "A", b: "B01", price: 1100, amount: 11, cost: 12100, saleDt: "2016-08-28", customer: "장서우", saleType: "B"},
-        {companyJson: {"대표자명":"abcd"}, a: "A", b: "C01", price: 1200, amount: 10, cost: 12000, saleDt: "2016-08-27", customer: "이영희", saleType: "A"},
-        {companyJson: {"대표자명":"abcd"}, a: "A", b: "A01", price: 1300, amount: 8, cost: 10400, saleDt: "2016-08-25", customer: "황인서", saleType: "C"},
-        {companyJson: {"대표자명":"abcd"}, a: "A", b: "B01", price: 1400, amount: 5, cost: 7000, saleDt: "2016-08-29", customer: "황세진", saleType: "D"},
-        {companyJson: {"대표자명":"abcd"}, a: "A", b: "A01", price: 1500, amount: 2, cost: 3000, saleDt: "2016-08-26", customer: "이서연", saleType: "A"}
+        {companyJson: {"대표자명": "----"}, a: "A", b: "A01", price: 1000, amount: 12, cost: 12000, saleDt: "2016-08-29", customer: "장기영", saleType: "A"},
+        {companyJson: {"대표자명": "abcd"}, a: "A", b: "B01", price: 1100, amount: 11, cost: 12100, saleDt: "2016-08-28", customer: "장서우", saleType: "B"},
+        {companyJson: {"대표자명": "abcd"}, a: "A", b: "C01", price: 1200, amount: 10, cost: 12000, saleDt: "2016-08-27", customer: "이영희", saleType: "A"},
+        {companyJson: {"대표자명": "위세라"}, a: "A", b: "A01", price: 1300, amount: 8, cost: 10400, saleDt: "2016-08-25", customer: "황인서", saleType: "C"},
+        {companyJson: {"대표자명": "abcd"}, a: "A", b: "B01", price: 1400, amount: 5, cost: 7000, saleDt: "2016-08-29", customer: "황세진", saleType: "D"},
+        {companyJson: {"대표자명": "abcd"}, a: "A", b: "A01", price: 1500, amount: 2, cost: 3000, saleDt: "2016-08-26", customer: "이서연", saleType: "A"}
     ];
 
     var gridView = {
         initView: function () {
             firstGrid.setConfig({
                 target: $('[data-ax5grid="first-grid"]'),
+                sortable: true,
+                multiSort: true,
+                remoteSort: function () {
+                    console.log(JSON.stringify(this.sortInfo, null, '\t'));
+                    gridView.setSortData(this.sortInfo);
+                },
+                body: {
+                    onDataChanged: function () {
+                        var rowNum = this.dindex;
+                        var gridData = this.list;
+                        console.log(rowNum);
+
+                        // Ajax 로직 대체
+                        setTimeout(function(){
+                            gridData[rowNum].cost = gridData[rowNum].price * gridData[rowNum].amount;
+                            firstGrid.updateRow(gridData[rowNum], rowNum);
+                        }, 1000);
+                    },
+                },
                 columns: [
                     {
                         key: "companyJson['대표자명']",
@@ -83,13 +106,13 @@
                         },
                         enableFilter: true,
                         align: "center",
-                        editor: {type:"text"}
+                        editor: {type: "text"}
                     },
                     {key: "b", label: "필드B", align: "center"},
                     {
                         key: undefined, label: "필드C", columns: [
-                        {key: "price", label: "단가", formatter: "money", align: "right"},
-                        {key: "amount", label: "수량", formatter: "money", align: "right"},
+                        {key: "price", label: "단가", formatter: "money", align: "right", editor: {type:"text"}},
+                        {key: "amount", label: "수량", formatter: "money", align: "right", editor: {type:"text"}},
                         {key: "cost", label: "금액", align: "right", formatter: "money"}
                     ]
                     },
@@ -115,6 +138,12 @@
             firstGrid.setData(sampleData);
 
             return this;
+        },
+        setSortData: function (sortInfo) {
+            var sortedList = sampleData.sort(function (a, b) {
+                return a["b"] < b["b"];
+            });
+            firstGrid.setData(sortedList);
         }
     };
 
